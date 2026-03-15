@@ -4,19 +4,183 @@ import vtk
 import os
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QFileDialog, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QCheckBox, QComboBox, QScrollArea, QSizePolicy
+    QApplication, QFileDialog, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QCheckBox, QComboBox, QScrollArea, QSizePolicy,
+    QDoubleSpinBox, QLabel
 )
 from PyQt5.QtCore import QTimer
 
 app = QApplication([])
+# -----------------------------
+#  Idioma
+# -----------------------------
+CURRENT_LANG = "pt-BR"
 
+TRANSLATIONS = {
+    "pt-BR": {
+        # Geral
+        "window_control_title": "Controle dos Eletrodos",
+        "window_camera_title": "Controle de Câmera",
+        "language_label": "Idioma:",
+        "lang_pt": "Português (BR)",
+        "lang_en": "English",
+        "step_label": "Passo:",
+
+        # Botões - controle de eletrodos
+        "add_electrode": "Adicionar Eletrodo",
+        "remove_last": "Remover Último Eletrodo",
+        "save": "Salvar",
+        "import": "Importar",
+        "close": "Fechar",
+
+        # Toggles
+        "front_snap_on": "Fixar na frente (Y mínimo): ON",
+        "front_snap_off": "Fixar na frente (Y mínimo): OFF",
+        "front_snap_tooltip": "Quando ON, o clique fixa no Y mínimo (frente). Quando OFF, o clique usa a superfície (laterais OK).",
+        "window_only_on": "Controle somente pela janela: ON",
+        "window_only_off": "Controle somente pela janela: OFF",
+        "window_only_tooltip": "Quando ON, cliques no torso são ignorados. Os botões X/Y/Z continuam funcionando.",
+
+        # Botões de movimento livre
+        "axis_x_neg": "X-",
+        "axis_x_pos": "X+",
+        "axis_y_neg": "Y-",
+        "axis_y_pos": "Y+",
+        "axis_z_neg": "Z-",
+        "axis_z_pos": "Z+",
+
+        # Janela da câmera
+        "cam_x_pos": "Camera X+",
+        "cam_x_neg": "Camera X-",
+        "cam_y_pos": "Camera Y+",
+        "cam_y_neg": "Camera Y-",
+        "cam_z_pos": "Camera Z+",
+        "cam_z_neg": "Camera Z-",
+        "cam_left": "Ângulo Esq.",
+        "cam_right": "Ângulo Dir.",
+        "cam_up": "Ângulo Cima",
+        "cam_down": "Ângulo Baixo",
+        "cam_reset": "Reset Camera",
+
+        # Diálogos
+        "select_folder": "Selecionar Pasta com Arquivos VTP",
+        "save_electrodes": "Salvar coordenadas dos eletrodos",
+        "import_electrodes": "Importar coordenadas dos eletrodos",
+
+        # Erros / mensagens
+        "error_no_folder": "Nenhuma pasta selecionada.",
+        "error_no_vtp": "Nenhum arquivo .vtp encontrado na pasta selecionada.",
+        "error_no_torso": "Nenhuma malha com 'torso' no nome foi encontrada para posicionar os eletrodos.",
+        "warning_no_actor": "[AVISO] Sem actor associado para '{fname}' (possivelmente 'Linha' ou não renderizado).",
+        "warning_no_plane": "[AVISO] '{name}' tem menos de 3 pontos - não é possível ajustar um plano.",
+        "warning_no_intersection": "[AVISO] Sem interseção detectada para '{name}' (slice vazio).",
+        "no_electrode_remove": "Nenhum eletrodo para remover.",
+        "electrode_added": "Eletrodo ({label}) adicionado em: X={x:.2f}, Y={y:.2f}, Z={z:.2f}",
+        "electrode_removed": "Último eletrodo removido: {label}.",
+        "electrode_remaining": "Número de eletrodos restantes: {n}",
+        "camera_mode_on": "Modo de controle de câmera ativado.",
+        "camera_mode_off": "Modo de controle de câmera desativado.",
+        "file_saved": "Arquivo '{path}' salvo com sucesso!",
+        "file_imported": "Arquivo '{path}' importado com sucesso!",
+        "line_import_error": "Erro ao ler linha:\n  {line}\n→ {err}",
+        "candidates_found": "Encontrados {n} pontos candidatos com tol={tol}",
+        "key_pressed": "Tecla pressionada: {key}",
+
+        # Câmera print
+        "camera_header": "----- Câmera -----",
+        "camera_position": "  Position = {pos}",
+        "camera_focal": "  Focal point = {focal}",
+        "camera_angles": "  Azimuth = {az:.2f}°, Elevation = {el:.2f}°",
+        "camera_footer": "------------------",
+    },
+
+    "en": {
+        # Geral
+        "window_control_title": "Electrode Control",
+        "window_camera_title": "Camera Control",
+        "language_label": "Language:",
+        "lang_pt": "Português (BR)",
+        "lang_en": "English",
+        "step_label": "Step:",
+
+        # Botões - controle de eletrodos
+        "add_electrode": "Add Electrode",
+        "remove_last": "Remove Last Electrode",
+        "save": "Save",
+        "import": "Import",
+        "close": "Close",
+
+        # Toggles
+        "front_snap_on": "Fix to front (minimum Y): ON",
+        "front_snap_off": "Fix to front (minimum Y): OFF",
+        "front_snap_tooltip": "When ON, click locks to the minimum Y (front). When OFF, click uses the surface (side positions allowed).",
+        "window_only_on": "Control only from window: ON",
+        "window_only_off": "Control only from window: OFF",
+        "window_only_tooltip": "When ON, clicks on the torso are ignored. The X/Y/Z buttons still work.",
+
+        # Botões de movimento livre
+        "axis_x_neg": "X-",
+        "axis_x_pos": "X+",
+        "axis_y_neg": "Y-",
+        "axis_y_pos": "Y+",
+        "axis_z_neg": "Z-",
+        "axis_z_pos": "Z+",
+
+        # Janela da câmera
+        "cam_x_pos": "Camera X+",
+        "cam_x_neg": "Camera X-",
+        "cam_y_pos": "Camera Y+",
+        "cam_y_neg": "Camera Y-",
+        "cam_z_pos": "Camera Z+",
+        "cam_z_neg": "Camera Z-",
+        "cam_left": "Angle Left",
+        "cam_right": "Angle Right",
+        "cam_up": "Angle Up",
+        "cam_down": "Angle Down",
+        "cam_reset": "Reset Camera",
+
+        # Diálogos
+        "select_folder": "Select Folder with VTP Files",
+        "save_electrodes": "Save electrode coordinates",
+        "import_electrodes": "Import electrode coordinates",
+
+        # Erros / mensagens
+        "error_no_folder": "No folder selected.",
+        "error_no_vtp": "No .vtp files found in the selected folder.",
+        "error_no_torso": "No mesh containing 'torso' in its name was found for electrode placement.",
+        "warning_no_actor": "[WARNING] No actor associated with '{fname}' (possibly a 'Linha' file or not rendered).",
+        "warning_no_plane": "[WARNING] '{name}' has fewer than 3 points - it is not possible to fit a plane.",
+        "warning_no_intersection": "[WARNING] No intersection detected for '{name}' (empty slice).",
+        "no_electrode_remove": "No electrode to remove.",
+        "electrode_added": "Electrode ({label}) added at: X={x:.2f}, Y={y:.2f}, Z={z:.2f}",
+        "electrode_removed": "Last electrode removed: {label}.",
+        "electrode_remaining": "Number of remaining electrodes: {n}",
+        "camera_mode_on": "Camera control mode enabled.",
+        "camera_mode_off": "Camera control mode disabled.",
+        "file_saved": "File '{path}' saved successfully!",
+        "file_imported": "File '{path}' imported successfully!",
+        "line_import_error": "Error reading line:\n  {line}\n→ {err}",
+        "candidates_found": "Found {n} candidate points with tol={tol}",
+        "key_pressed": "Key pressed: {key}",
+
+        # Câmera print
+        "camera_header": "----- Camera -----",
+        "camera_position": "  Position = {pos}",
+        "camera_focal": "  Focal point = {focal}",
+        "camera_angles": "  Azimuth = {az:.2f}°, Elevation = {el:.2f}°",
+        "camera_footer": "------------------",
+    }
+}
+
+def tr(key, **kwargs):
+    text = TRANSLATIONS[CURRENT_LANG].get(key, key)
+    return text.format(**kwargs) if kwargs else text
 # -----------------------------
 #  SELEÇÃO DE PASTA E LEITURA
 # -----------------------------
-folder_path = QFileDialog.getExistingDirectory(None, "Selecionar Pasta com Arquivos VTP")
+folder_path = QFileDialog.getExistingDirectory(None, tr("select_folder"))
 if not folder_path:
-    raise Exception("Nenhuma pasta selecionada.")
+    raise Exception(tr("error_no_folder"))
 
 vtp_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.vtp')]
 # Ordem estável para a paleta não "pular"
@@ -29,7 +193,7 @@ OUT_OPACITY   = 0.90       # opacidade das outras malhas
 PLANE_OPACITY = 0.25       # opacidade dos planos
 
 if not vtp_files:
-    raise Exception("Nenhum arquivo .vtp encontrado na pasta selecionada.")
+    raise Exception("error_no_vtp")
 
 # Paleta daltônico-safe (Okabe–Ito + extensões suaves), sem cinzas
 color_palette = [
@@ -70,7 +234,7 @@ for file_path in vtp_files:
             linha_raw_points.append({'name': name, 'points': pts})
             linha_filenames.append(name)
         else:
-            print(f"[AVISO] '{name}' tem menos de 3 pontos - não é possível ajustar um plano.")
+            print(tr("warning_no_plane", name=name))
         continue
 
     # Render: todo VTP que não é "Linha" continua visível/controlável
@@ -85,7 +249,7 @@ for file_path in vtp_files:
         torso_proj_filenames.append(name)
 
 if not torso_proj_meshes:
-    raise Exception("Nenhuma malha com 'torso' no nome foi encontrada para posicionar os eletrodos.")
+    raise Exception(tr("error_no_torso"))
 
 
 # -----------------------------
@@ -262,10 +426,7 @@ def create_or_replace_electrode(label, position):
     """
     Remove marca antiga (caso exista) e cria novo 'label' em 'position'.
     Adiciona/atualiza a lista electrodes e o dicionário electrode_actors.
-
-    REGRAS ESPECIAIS:
-    - Se label == 'COL', sempre insere no INÍCIO de electrodes (primeiro da fila).
-    - Caso contrário, insere ao final.
+    Todos os eletrodos são tratados da mesma forma.
     """
     global electrodes, electrode_actors
 
@@ -274,7 +435,6 @@ def create_or_replace_electrode(label, position):
         old_sphere, old_text = electrode_actors[label]
         plotter.remove_actor(old_sphere)
         plotter.remove_actor(old_text)
-        # Remove qualquer entrada antiga do label em "electrodes"
         electrodes = [(lbl, pos) for (lbl, pos) in electrodes if lbl != label]
 
     # Cria nova esfera
@@ -282,83 +442,40 @@ def create_or_replace_electrode(label, position):
         pv.Sphere(radius=3, center=position),
         color='green', opacity=1.0
     )
-    # Cria o texto (rótulo) com fonte menor
+
+    # Cria o texto (rótulo)
     text_actor = plotter.add_point_labels(
         [position],
         [label],
-        font_size=8,   # Texto menor
-        point_size=5,  # Ponto de referência menor
+        font_size=8,
+        point_size=5,
         always_visible=True
     )
 
     electrode_actors[label] = (sphere_actor, text_actor)
+    electrodes.append((label, position))
 
-    # Se for 'COL', insere no INÍCIO da fila
-    if label == 'COL':
-        electrodes.insert(0, (label, position))
-    else:
-        electrodes.append((label, position))
-
-    print(f"\nEletrodo ({label}) adicionado em: "
-          f"X={position[0]:.2f}, Y={position[1]:.2f}, Z={position[2]:.2f}")
+    print("\n" + tr(
+    "electrode_added",
+    label=label,
+    x=position[0],
+    y=position[1],
+    z=position[2]
+    ))
 
 # -----------------------------
 #  FUNÇÕES PRINCIPAIS
 # -----------------------------
 def add_electrode():
     """
-    Quando "Adicionar Eletrodo" é clicado:
-      - Se label == "COL", apenas cria/atualiza esse ponto e insere no início da fila.
-      - Se label == "LA":
-         1) Marca LA na posição do preview
-         2) Se 'COL' existir, faz marcação automática de RA, LL, RL:
-            RA: reflexo de LA em rel. à COL
-            LL: LA_x-50, LA_y, LA_z-600
-            RL: reflexo de LL em rel. à COL
-      - Caso contrário, marca só esse label (V1, V2, etc.).
+    Adiciona manualmente o eletrodo selecionado na posição atual do preview.
+    Não há mais posicionamento automático de eletrodos de membro.
     """
     global preview_actor
     label = control_window.combo_label.currentText()
     pos = preview_actor.GetPosition()
 
-    if label == "COL":
-        # Apenas criar/atualizar a coluna no preview
-        create_or_replace_electrode("COL", pos)
-
-    elif label == "LA":
-        # 1) Cria LA
-        create_or_replace_electrode("LA", pos)
-
-        # 2) Se COL estiver marcado, cria RA, LL, RL
-        if "COL" in electrode_actors:
-            # Pegamos a posição da coluna
-            _, col_pos = next(((lbl, p) for lbl, p in electrodes if lbl == "COL"), (None, None))
-            if col_pos is not None:
-                x_col = col_pos[0]
-
-                # RA => reflexo de LA em rel. à COL
-                # RA_x = 2*x_col - LA_x
-                ra_x = 2*x_col - pos[0]
-                ra_pos = (ra_x, pos[1], pos[2])
-                create_or_replace_electrode("RA", ra_pos)
-
-                # LL => (LA_x-50, LA_y, LA_z-600) [igual antes]
-                ll_pos = (pos[0] - 50, pos[1], pos[2] - 600)
-                create_or_replace_electrode("LL", ll_pos)
-
-                # RL => reflexo de LL em rel. à COL
-                # RL_x = 2*x_col - ll_x
-                rl_x = 2*x_col - ll_pos[0]
-                rl_pos = (rl_x, ll_pos[1], ll_pos[2])
-                create_or_replace_electrode("RL", rl_pos)
-
-        # Se COL não existe, não faz RA, LL, RL
-        # (ou seja, só LA)
-
-    else:
-        # V1, V2, V3, V4, V5, V6, RA, LL, RL etc. => Marca só esse label
-        create_or_replace_electrode(label, pos)
-
+    create_or_replace_electrode(label, pos)
     plotter.render()
 
 def remove_last_electrode():
@@ -368,7 +485,7 @@ def remove_last_electrode():
     """
     global electrodes, electrode_actors
     if not electrodes:
-        print("Nenhum eletrodo para remover.")
+        print(tr("no_electrode_remove"))
         return
 
     # "Pop" retira o último item (label, posição)
@@ -380,8 +497,8 @@ def remove_last_electrode():
         plotter.remove_actor(text_actor)
         del electrode_actors[last_label]
 
-    print(f"Último eletrodo removido: {last_label}.")
-    print(f"Número de eletrodos restantes: {len(electrodes)}")
+    print(tr("electrode_removed", label=last_label))
+    print(tr("electrode_remaining", n=len(electrodes)))
 
 def find_lowest_y_point(mouse_position, tol=None):
     closest_point_id = mesh_torso_proj.find_closest_point(mouse_position)
@@ -472,7 +589,7 @@ def capture_key_events(iren, event):
 def save_files():
     global electrodes
     txt_file_path, _ = QFileDialog.getSaveFileName(
-        None, "Salvar coordenadas dos eletrodos", 
+        None, tr("save_electrodes"),
         "", "TXT files (*.txt);;All files (*)"
     )
     if txt_file_path:
@@ -495,7 +612,7 @@ def import_files():
 
     txt_file_path, _ = QFileDialog.getOpenFileName(
         None,
-        "Importar coordenadas dos eletrodos",
+        tr("import_electrodes"),
         "",
         "TXT files (*.txt);;All files (*)"
     )
@@ -549,26 +666,36 @@ def move_preview_free(dx=0.0, dy=0.0, dz=0.0, step=1.0):
 class ControlWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Controle dos Eletrodos")
-        self.setGeometry(1100, 100, 300, 550)  # Define posição e tamanho inicial fixo
+        self.setGeometry(1100, 100, 300, 550)
 
-        # Layout principal da janela
         main_layout = QVBoxLayout(self)
 
-        # Scroll Area para conter os widgets
         scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)  # Permite redimensionamento automático
+        scroll_area.setWidgetResizable(True)
 
-        # Widget central dentro do scroll
         scroll_widget = QWidget()
         scroll_area.setWidget(scroll_widget)
 
-        # Layout dentro do widget do scroll
         layout = QVBoxLayout(scroll_widget)
+
+        # -------------------------
+        # Idioma
+        # -------------------------
+        self.language_row = QHBoxLayout()
+        self.language_label = QLabel()
+        self.language_combo = QComboBox()
+        self.language_combo.addItem(TRANSLATIONS["pt-BR"]["lang_pt"], "pt-BR")
+        self.language_combo.addItem(TRANSLATIONS["en"]["lang_en"], "en")
+        self.language_combo.setCurrentIndex(0 if CURRENT_LANG == "pt-BR" else 1)
+        self.language_combo.currentIndexChanged.connect(self.change_language)
+
+        self.language_row.addWidget(self.language_label)
+        self.language_row.addWidget(self.language_combo)
+        layout.addLayout(self.language_row)
 
         # ComboBox com rótulos
         self.combo_label = QComboBox()
-        electrode_labels = ["COL","V1","V2","V3","V4","V5","V6","LA","RA","LL","RL"]
+        electrode_labels = ["V1","V2","V3","V4","V5","V6","LA","RA","LL","RL"]
         self.combo_label.addItems(electrode_labels)
         layout.addWidget(self.combo_label)
 
@@ -577,30 +704,31 @@ class ControlWindow(QWidget):
         # -------------------------
         move_layout = QVBoxLayout()
 
-        # Controle de passo (padrão = 1.0)
-        from PyQt5.QtWidgets import QDoubleSpinBox, QLabel
-        step_row = QHBoxLayout()
-        step_label = QLabel("Passo:")
+        self.step_row = QHBoxLayout()
+        self.step_label = QLabel()
         self.step_spin = QDoubleSpinBox()
         self.step_spin.setDecimals(2)
         self.step_spin.setRange(0.01, 1000.0)
         self.step_spin.setSingleStep(0.25)
         self.step_spin.setValue(1.0)
-        step_row.addWidget(step_label)
-        step_row.addWidget(self.step_spin)
-        move_layout.addLayout(step_row)
+        self.step_row.addWidget(self.step_label)
+        self.step_row.addWidget(self.step_spin)
+        move_layout.addLayout(self.step_row)
 
-        # Helpers para criar par de botões com press-and-hold
-        def make_axis_controls(axis_name, neg_cb, pos_cb):
+        def make_axis_controls(neg_key, pos_key, neg_cb, pos_cb):
             row = QHBoxLayout()
-            btn_neg = QPushButton(f"{axis_name}-")
-            btn_pos = QPushButton(f"{axis_name}+")
+            btn_neg = QPushButton()
+            btn_pos = QPushButton()
+            btn_neg._translation_key = neg_key
+            btn_pos._translation_key = pos_key
+
             timer_neg = QTimer()
             timer_pos = QTimer()
 
             def start_neg():
                 neg_cb()
                 timer_neg.start(80)
+
             def start_pos():
                 pos_cb()
                 timer_pos.start(80)
@@ -615,91 +743,78 @@ class ControlWindow(QWidget):
 
             row.addWidget(btn_neg)
             row.addWidget(btn_pos)
-            return row
+            return row, btn_neg, btn_pos
 
         def step_value():
             return float(self.step_spin.value())
 
-        # X-/X+
-        row_x = make_axis_controls(
-            "X",
+        self.row_x, self.btn_x_neg, self.btn_x_pos = make_axis_controls(
+            "axis_x_neg", "axis_x_pos",
             lambda: move_preview_free(dx=-1, dy=0, dz=0, step=step_value()),
             lambda: move_preview_free(dx=+1, dy=0, dz=0, step=step_value()),
         )
-        # Y-/Y+
-        row_y = make_axis_controls(
-            "Y",
+
+        self.row_y, self.btn_y_neg, self.btn_y_pos = make_axis_controls(
+            "axis_y_neg", "axis_y_pos",
             lambda: move_preview_free(dx=0, dy=-1, dz=0, step=step_value()),
             lambda: move_preview_free(dx=0, dy=+1, dz=0, step=step_value()),
         )
-        # Z-/Z+
-        row_z = make_axis_controls(
-            "Z",
+
+        self.row_z, self.btn_z_neg, self.btn_z_pos = make_axis_controls(
+            "axis_z_neg", "axis_z_pos",
             lambda: move_preview_free(dx=0, dy=0, dz=-1, step=step_value()),
             lambda: move_preview_free(dx=0, dy=0, dz=+1, step=step_value()),
         )
 
-        move_layout.addLayout(row_x)
-        move_layout.addLayout(row_y)
-        move_layout.addLayout(row_z)
+        move_layout.addLayout(self.row_x)
+        move_layout.addLayout(self.row_y)
+        move_layout.addLayout(self.row_z)
         layout.addLayout(move_layout)
-
 
         # -------------------------
         # Botões principais
         # -------------------------
-        button_add = QPushButton("Adicionar Eletrodo")
-        button_remove = QPushButton("Remover Último Eletrodo")
-        button_save = QPushButton("Salvar")
-        button_close = QPushButton("Fechar")
-        button_import = QPushButton("Importar")
+        self.button_add = QPushButton()
+        self.button_remove = QPushButton()
+        self.button_save = QPushButton()
+        self.button_close = QPushButton()
+        self.button_import = QPushButton()
 
-        button_add.clicked.connect(add_electrode)
-        button_remove.clicked.connect(remove_last_electrode)
-        button_save.clicked.connect(save_files)
-        button_close.clicked.connect(lambda: sys.exit(0))
-        button_import.clicked.connect(import_files)
+        self.button_add.clicked.connect(add_electrode)
+        self.button_remove.clicked.connect(remove_last_electrode)
+        self.button_save.clicked.connect(save_files)
+        self.button_close.clicked.connect(lambda: sys.exit(0))
+        self.button_import.clicked.connect(import_files)
 
-        layout.addWidget(button_add)
-        layout.addWidget(button_remove)
-        layout.addWidget(button_save)
-        layout.addWidget(button_import)
-        layout.addWidget(button_close)
+        layout.addWidget(self.button_add)
+        layout.addWidget(self.button_remove)
+        layout.addWidget(self.button_save)
+        layout.addWidget(self.button_import)
+        layout.addWidget(self.button_close)
 
-        # -------------------------------------------------
-        # Toggle: Fixar na frente (Y mínimo) ON/OFF
-        # -------------------------------------------------
-
-        # Botão único de SNAP (frente)
+        # -------------------------
+        # Toggles
+        # -------------------------
         self.btn_toggle_front = QPushButton()
-        # Botão de prioridade: somente janela (desativa clique)
         self.btn_window_only = QPushButton()
 
         def refresh_toggle_texts():
-            # Snap (frente)
             self.btn_toggle_front.setText(
-                "Fixar na frente (Y mínimo): ON" if front_snap_enabled
-                else "Fixar na frente (Y mínimo): OFF"
+                tr("front_snap_on") if front_snap_enabled else tr("front_snap_off")
             )
-            self.btn_toggle_front.setToolTip(
-                "Quando ON, o clique fixa no Y mínimo (frente). Quando OFF, o clique usa a superfície (laterais OK)."
-            )
-            # Somente janela
-            self.btn_window_only.setText(
-                "Controle somente pela janela: ON" if window_only_mode
-                else "Controle somente pela janela: OFF"
-            )
-            self.btn_window_only.setToolTip(
-                "Quando ON, cliques no torso são ignorados. Os botões X/Y/Z continuam funcionando."
-            )
+            self.btn_toggle_front.setToolTip(tr("front_snap_tooltip"))
 
-        refresh_toggle_texts()
+            self.btn_window_only.setText(
+                tr("window_only_on") if window_only_mode else tr("window_only_off")
+            )
+            self.btn_window_only.setToolTip(tr("window_only_tooltip"))
+
+        self.refresh_toggle_texts = refresh_toggle_texts
 
         def on_toggle_front():
             global front_snap_enabled, current_preview_position
             front_snap_enabled = not front_snap_enabled
-            refresh_toggle_texts()
-            # Re-snap do preview para refletir o novo modo de clique (visual)
+            self.refresh_ui_texts()
             snapped = snap_point_to_torso(preview_actor.GetPosition())
             preview_actor.SetPosition(snapped)
             current_preview_position = snapped
@@ -708,16 +823,13 @@ class ControlWindow(QWidget):
         def on_toggle_window_only():
             global window_only_mode
             window_only_mode = not window_only_mode
-            refresh_toggle_texts()
-            # Sem mais ações: prioridade já é garantida em on_left_click()
+            self.refresh_ui_texts()
 
         self.btn_toggle_front.clicked.connect(on_toggle_front)
         self.btn_window_only.clicked.connect(on_toggle_window_only)
 
-        # Adiciona ao layout
         layout.addWidget(self.btn_toggle_front)
         layout.addWidget(self.btn_window_only)
-
 
         # -------------------------
         # Checkboxes dos arquivos
@@ -730,23 +842,48 @@ class ControlWindow(QWidget):
             self.checkboxes.append(checkbox)
             layout.addWidget(checkbox)
 
-        # Adiciona o scroll area ao layout principal da janela
         main_layout.addWidget(scroll_area)
-
-        # Impede redimensionamento além do tamanho inicial
         self.setFixedSize(300, 550)
+
+        self.refresh_ui_texts()
+
+    def refresh_ui_texts(self):
+        self.setWindowTitle(tr("window_control_title"))
+        self.language_label.setText(tr("language_label"))
+        self.step_label.setText(tr("step_label"))
+
+        self.button_add.setText(tr("add_electrode"))
+        self.button_remove.setText(tr("remove_last"))
+        self.button_save.setText(tr("save"))
+        self.button_import.setText(tr("import"))
+        self.button_close.setText(tr("close"))
+
+        self.btn_x_neg.setText(tr("axis_x_neg"))
+        self.btn_x_pos.setText(tr("axis_x_pos"))
+        self.btn_y_neg.setText(tr("axis_y_neg"))
+        self.btn_y_pos.setText(tr("axis_y_pos"))
+        self.btn_z_neg.setText(tr("axis_z_neg"))
+        self.btn_z_pos.setText(tr("axis_z_pos"))
+
+        self.refresh_toggle_texts()
+
+        if 'camera_window' in globals() and camera_window is not None:
+            camera_window.refresh_ui_texts()
+
+    def change_language(self):
+        global CURRENT_LANG
+        CURRENT_LANG = self.language_combo.currentData()
+        self.refresh_ui_texts()
 
     def toggle_mesh_visibility(self, index, state):
         fname = os.path.basename(vtp_files[index])
         actor = file_actor_map.get(fname)
         if actor is None:
-            # Isso é normal para arquivos "Linha" (sem actor) ou itens ignorados.
-            print(f"[AVISO] Sem actor associado para '{fname}' (possivelmente 'Linha' ou não renderizado).")
+            print(tr("warning_no_actor", fname=fname))
             return
 
         visible = (state == 2)
 
-        # Agora só controla os planos/malhas, não mexe nas interseções
         try:
             actor.SetVisibility(visible)
             actor.SetPickable(visible)
@@ -757,7 +894,6 @@ class ControlWindow(QWidget):
 
 
 
-
 # ---------------------------------------------------
 #  JANELA 2: CONTROLE DE CÂMERA (com reset)
 # ---------------------------------------------------
@@ -765,7 +901,6 @@ class CameraControlWindow(QWidget):
     def __init__(self, plotter):
         super().__init__()
         self.plotter = plotter
-        self.setWindowTitle("Controle de Câmera")
         self.setGeometry(1450, 100, 300, 450)
 
         main_layout = QVBoxLayout()
@@ -800,116 +935,128 @@ class CameraControlWindow(QWidget):
             self.plotter.render()
             self.print_camera_state()
 
-        # Translação
-        btn_cam_x_pos = QPushButton("Camera X+")
+        self.btn_cam_x_pos = QPushButton()
         timer_cam_x_pos = QTimer()
         timer_cam_x_pos.timeout.connect(lambda: move_camera(dx=10))
         def on_press_cam_x_pos():
             move_camera(dx=10)
             timer_cam_x_pos.start(100)
-        btn_cam_x_pos.pressed.connect(on_press_cam_x_pos)
-        btn_cam_x_pos.released.connect(timer_cam_x_pos.stop)
+        self.btn_cam_x_pos.pressed.connect(on_press_cam_x_pos)
+        self.btn_cam_x_pos.released.connect(timer_cam_x_pos.stop)
 
-        btn_cam_x_neg = QPushButton("Camera X-")
+        self.btn_cam_x_neg = QPushButton()
         timer_cam_x_neg = QTimer()
         timer_cam_x_neg.timeout.connect(lambda: move_camera(dx=-10))
         def on_press_cam_x_neg():
             move_camera(dx=-10)
             timer_cam_x_neg.start(100)
-        btn_cam_x_neg.pressed.connect(on_press_cam_x_neg)
-        btn_cam_x_neg.released.connect(timer_cam_x_neg.stop)
+        self.btn_cam_x_neg.pressed.connect(on_press_cam_x_neg)
+        self.btn_cam_x_neg.released.connect(timer_cam_x_neg.stop)
 
-        btn_cam_y_pos = QPushButton("Camera Y+")
+        self.btn_cam_y_pos = QPushButton()
         timer_cam_y_pos = QTimer()
         timer_cam_y_pos.timeout.connect(lambda: move_camera(dy=10))
         def on_press_cam_y_pos():
             move_camera(dy=10)
             timer_cam_y_pos.start(100)
-        btn_cam_y_pos.pressed.connect(on_press_cam_y_pos)
-        btn_cam_y_pos.released.connect(timer_cam_y_pos.stop)
+        self.btn_cam_y_pos.pressed.connect(on_press_cam_y_pos)
+        self.btn_cam_y_pos.released.connect(timer_cam_y_pos.stop)
 
-        btn_cam_y_neg = QPushButton("Camera Y-")
+        self.btn_cam_y_neg = QPushButton()
         timer_cam_y_neg = QTimer()
         timer_cam_y_neg.timeout.connect(lambda: move_camera(dy=-10))
         def on_press_cam_y_neg():
             move_camera(dy=-10)
             timer_cam_y_neg.start(100)
-        btn_cam_y_neg.pressed.connect(on_press_cam_y_neg)
-        btn_cam_y_neg.released.connect(timer_cam_y_neg.stop)
+        self.btn_cam_y_neg.pressed.connect(on_press_cam_y_neg)
+        self.btn_cam_y_neg.released.connect(timer_cam_y_neg.stop)
 
-        btn_cam_z_pos = QPushButton("Camera Z+")
+        self.btn_cam_z_pos = QPushButton()
         timer_cam_z_pos = QTimer()
         timer_cam_z_pos.timeout.connect(lambda: move_camera(dz=10))
         def on_press_cam_z_pos():
             move_camera(dz=10)
             timer_cam_z_pos.start(100)
-        btn_cam_z_pos.pressed.connect(on_press_cam_z_pos)
-        btn_cam_z_pos.released.connect(timer_cam_z_pos.stop)
+        self.btn_cam_z_pos.pressed.connect(on_press_cam_z_pos)
+        self.btn_cam_z_pos.released.connect(timer_cam_z_pos.stop)
 
-        btn_cam_z_neg = QPushButton("Camera Z-")
+        self.btn_cam_z_neg = QPushButton()
         timer_cam_z_neg = QTimer()
         timer_cam_z_neg.timeout.connect(lambda: move_camera(dz=-10))
         def on_press_cam_z_neg():
             move_camera(dz=-10)
             timer_cam_z_neg.start(100)
-        btn_cam_z_neg.pressed.connect(on_press_cam_z_neg)
-        btn_cam_z_neg.released.connect(timer_cam_z_neg.stop)
+        self.btn_cam_z_neg.pressed.connect(on_press_cam_z_neg)
+        self.btn_cam_z_neg.released.connect(timer_cam_z_neg.stop)
 
-        main_layout.addWidget(btn_cam_x_pos)
-        main_layout.addWidget(btn_cam_x_neg)
-        main_layout.addWidget(btn_cam_y_pos)
-        main_layout.addWidget(btn_cam_y_neg)
-        main_layout.addWidget(btn_cam_z_pos)
-        main_layout.addWidget(btn_cam_z_neg)
+        main_layout.addWidget(self.btn_cam_x_pos)
+        main_layout.addWidget(self.btn_cam_x_neg)
+        main_layout.addWidget(self.btn_cam_y_pos)
+        main_layout.addWidget(self.btn_cam_y_neg)
+        main_layout.addWidget(self.btn_cam_z_pos)
+        main_layout.addWidget(self.btn_cam_z_neg)
 
-        # Rotação
-        btn_cam_left = QPushButton("Ângulo Esq.")
+        self.btn_cam_left = QPushButton()
         timer_cam_left = QTimer()
         timer_cam_left.timeout.connect(lambda: rotate_camera('left'))
         def on_press_cam_left():
             rotate_camera('left')
             timer_cam_left.start(100)
-        btn_cam_left.pressed.connect(on_press_cam_left)
-        btn_cam_left.released.connect(timer_cam_left.stop)
+        self.btn_cam_left.pressed.connect(on_press_cam_left)
+        self.btn_cam_left.released.connect(timer_cam_left.stop)
 
-        btn_cam_right = QPushButton("Ângulo Dir.")
+        self.btn_cam_right = QPushButton()
         timer_cam_right = QTimer()
         timer_cam_right.timeout.connect(lambda: rotate_camera('right'))
         def on_press_cam_right():
             rotate_camera('right')
             timer_cam_right.start(100)
-        btn_cam_right.pressed.connect(on_press_cam_right)
-        btn_cam_right.released.connect(timer_cam_right.stop)
+        self.btn_cam_right.pressed.connect(on_press_cam_right)
+        self.btn_cam_right.released.connect(timer_cam_right.stop)
 
-        btn_cam_up = QPushButton("Ângulo Cima")
+        self.btn_cam_up = QPushButton()
         timer_cam_up = QTimer()
         timer_cam_up.timeout.connect(lambda: rotate_camera('up'))
         def on_press_cam_up():
             rotate_camera('up')
             timer_cam_up.start(100)
-        btn_cam_up.pressed.connect(on_press_cam_up)
-        btn_cam_up.released.connect(timer_cam_up.stop)
+        self.btn_cam_up.pressed.connect(on_press_cam_up)
+        self.btn_cam_up.released.connect(timer_cam_up.stop)
 
-        btn_cam_down = QPushButton("Ângulo Baixo")
+        self.btn_cam_down = QPushButton()
         timer_cam_down = QTimer()
         timer_cam_down.timeout.connect(lambda: rotate_camera('down'))
         def on_press_cam_down():
             rotate_camera('down')
             timer_cam_down.start(100)
-        btn_cam_down.pressed.connect(on_press_cam_down)
-        btn_cam_down.released.connect(timer_cam_down.stop)
+        self.btn_cam_down.pressed.connect(on_press_cam_down)
+        self.btn_cam_down.released.connect(timer_cam_down.stop)
 
-        main_layout.addWidget(btn_cam_left)
-        main_layout.addWidget(btn_cam_right)
-        main_layout.addWidget(btn_cam_up)
-        main_layout.addWidget(btn_cam_down)
+        main_layout.addWidget(self.btn_cam_left)
+        main_layout.addWidget(self.btn_cam_right)
+        main_layout.addWidget(self.btn_cam_up)
+        main_layout.addWidget(self.btn_cam_down)
 
-        # Botão de Reset
-        btn_reset = QPushButton("Reset Camera")
-        btn_reset.clicked.connect(reset_camera)
-        main_layout.addWidget(btn_reset)
+        self.btn_reset = QPushButton()
+        self.btn_reset.clicked.connect(reset_camera)
+        main_layout.addWidget(self.btn_reset)
 
         self.setLayout(main_layout)
+        self.refresh_ui_texts()
+
+    def refresh_ui_texts(self):
+        self.setWindowTitle(tr("window_camera_title"))
+        self.btn_cam_x_pos.setText(tr("cam_x_pos"))
+        self.btn_cam_x_neg.setText(tr("cam_x_neg"))
+        self.btn_cam_y_pos.setText(tr("cam_y_pos"))
+        self.btn_cam_y_neg.setText(tr("cam_y_neg"))
+        self.btn_cam_z_pos.setText(tr("cam_z_pos"))
+        self.btn_cam_z_neg.setText(tr("cam_z_neg"))
+        self.btn_cam_left.setText(tr("cam_left"))
+        self.btn_cam_right.setText(tr("cam_right"))
+        self.btn_cam_up.setText(tr("cam_up"))
+        self.btn_cam_down.setText(tr("cam_down"))
+        self.btn_reset.setText(tr("cam_reset"))
 
     def print_camera_state(self):
         cam = self.plotter.camera
@@ -917,11 +1064,11 @@ class CameraControlWindow(QWidget):
         focal = cam.focal_point
         az = cam.azimuth
         el = cam.elevation
-        print("----- Câmera -----")
-        print(f"  Position = {pos}")
-        print(f"  Focal point = {focal}")
-        print(f"  Azimuth = {az:.2f}°, Elevation = {el:.2f}°")
-        print("------------------")
+        print(tr("camera_header"))
+        print(tr("camera_position", pos=pos))
+        print(tr("camera_focal", focal=focal))
+        print(tr("camera_angles", az=az, el=el))
+        print(tr("camera_footer"))
 
 # ----------------------------------------
 #  CRIANDO JANELAS E INICIANDO APLICAÇÃO
