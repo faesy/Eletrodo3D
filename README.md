@@ -23,28 +23,6 @@ python3 Eletrodos_3d.py
 ```
 
 * Choose the directory with the .vtp files
-* If the control windows do not render, follow these steps:
-    * Install pyvistaqt:
-
-    ```
-    pip install pyvistaqt
-    ```
-
-    * Import it in the code:
-    ```
-    from pyvistaqt import BackgroundPlotter
-    ```
-
-    * Replace line 258:
-
-    ```
-    plotter = pv.Plotter() → plotter = BackgroundPlotter(show=True)
-    ```
-
-    * Replace line 1086:
-    ```
-    plotter.show() → # plotter.show()
-    ```
 
 * Use the software to mark and save electrodes. Tools:
     01. Select the language (English or Portuguese)

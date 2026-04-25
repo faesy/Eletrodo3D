@@ -2,3 +2,4 @@ pyvista
 numpy
 vtk
 PyQt5
+pyvistaqt

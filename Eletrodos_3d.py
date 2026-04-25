@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
     QDoubleSpinBox, QLabel
 )
 from PyQt5.QtCore import QTimer
+from pyvistaqt import BackgroundPlotter
 
 app = QApplication([])
 # -----------------------------
@@ -228,7 +229,7 @@ for file_path in vtp_files:
     mesh = pv.read(file_path)
 
     # "Linha" -> só para gerar planos auxiliares
-    if 'linha' in name.lower():
+    if 'plane' in name.lower():
         if mesh.n_points >= 3:
             pts = np.asarray(mesh.points)
             linha_raw_points.append({'name': name, 'points': pts})
@@ -255,7 +256,8 @@ if not torso_proj_meshes:
 # -----------------------------
 #  PLOTTER E MALHAS
 # -----------------------------
-plotter = pv.Plotter()
+# plotter = pv.Plotter()
+plotter = BackgroundPlotter(show=True)
 
 # Posição inicial da câmera
 INITIAL_CAM_POS = (33.92955911088626, -868.6406385699812, 72.59394144121086)
@@ -1083,7 +1085,7 @@ plotter.iren.add_observer("LeftButtonPressEvent", on_left_click)
 plotter.iren.add_observer("KeyPressEvent", move_preview)
 plotter.iren.add_observer("KeyPressEvent", capture_key_events)
 
-plotter.show()
+# plotter.show()
 app.exec_()
 
 
