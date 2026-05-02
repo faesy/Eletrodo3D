@@ -34,10 +34,15 @@ python3 Eletrodos_3d.py
     07. Save the marked electrodes to a .txt file
     08. Import previously marked electrodes
     09. Close the program
-    10. When OFF, allows marking electrodes outside the torso
-    11. When ON, disables direct electrode marking in the graphical interface
-    12. Determine which geometries are visible
-    13. Control the camera
+    10. Open the plane control window. 
+    - 10.1. Choose the step size for moving a plane  
+    - 10.2. Move the plane along each axis  
+    - 10.3. Choose the step size for rotating a plane  
+    - 10.4. Rotate the plane along each axis  
+    11. When OFF, allows marking electrodes outside the torso
+    12. When ON, disables direct electrode marking in the graphical interface
+    13. Determine which geometries are visible
+    14. Control the camera
 
 <p align="center">
   <img src="Tools.png" width = "1000"/>

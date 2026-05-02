@@ -93,6 +93,14 @@ TRANSLATIONS = {
         "camera_focal": "  Focal point = {focal}",
         "camera_angles": "  Azimuth = {az:.2f}°, Elevation = {el:.2f}°",
         "camera_footer": "------------------",
+
+        "plane_move": "Mover Plano",
+        "plane_rotate": "Rotacionar Plano",
+        "plane_reset": "Resetar Plano",
+        "window_plane_title": "Controle do Plano",
+        "create_plane": "Criar Plano",
+        "save_plane_vtp": "Salvar Plano em .vtp",
+        "remove_last_plane": "Remover Último Plano Adicionado",
     },
 
     "en": {
@@ -170,12 +178,21 @@ TRANSLATIONS = {
         "camera_focal": "  Focal point = {focal}",
         "camera_angles": "  Azimuth = {az:.2f}°, Elevation = {el:.2f}°",
         "camera_footer": "------------------",
+
+        "plane_move": "Move Plane",
+        "plane_rotate": "Rotate Plane",
+        "plane_reset": "Reset Plane",
+        "window_plane_title": "Plane Control",
+        "create_plane": "Create Plane",
+        "save_plane_vtp": "Save plane in .vtp",
+        "remove_last_plane": "Remove Last Added Plane",
     }
 }
 
 def tr(key, **kwargs):
     text = TRANSLATIONS[CURRENT_LANG].get(key, key)
     return text.format(**kwargs) if kwargs else text
+
 # -----------------------------
 #  SELEÇÃO DE PASTA E LEITURA
 # -----------------------------
@@ -214,7 +231,6 @@ color_palette = [
     [0.50, 0.50, 0.00],  # oliva
 ]
 
-
 # Separar malhas para renderização e para projeção dos eletrodos
 render_meshes = []          # tudo que não for "Linha" (continua sendo exibido e com checkbox)
 render_filenames = []
@@ -223,6 +239,12 @@ torso_proj_filenames = []
 linha_raw_points = []       # lista de dicts com info para gerar plano depois
 linha_filenames = []
 
+saved_planes = {}   # nome → dados do plano
+saved_planes_order = []  # ordem de criação
+saved_intersections = []
+plane_window = None
+plane_actor = None
+intersection_actor = None
 
 for file_path in vtp_files:
     name = os.path.basename(file_path)
@@ -251,7 +273,6 @@ for file_path in vtp_files:
 
 if not torso_proj_meshes:
     raise Exception(tr("error_no_torso"))
-
 
 # -----------------------------
 #  PLOTTER E MALHAS
@@ -304,14 +325,12 @@ for i, mesh in enumerate(render_meshes):
 
     file_actor_map[render_filenames[i]] = actor
 
-
 plotter.add_legend()
 
 # MultiBlock para PROJEÇÃO dos eletrodos (apenas 'torso*')
 mb_proj = pv.MultiBlock(torso_proj_meshes)
 mesh_torso_proj = mb_proj.combine()
 plotter.add_mesh(mesh_torso_proj, opacity=0)  # invisível; usado só para o snap
-
 
 # Criar planos auxiliares a partir dos VTPs "Linha"
 def best_fit_plane(points: np.ndarray):
@@ -347,6 +366,7 @@ for i, item in enumerate(linha_raw_points):
     actor = plotter.add_mesh(plane, color=color, opacity=0.25, label=f"Plano: {item['name']}")
     linha_plane_actors.append(actor)
     file_actor_map[item['name']] = actor
+
 # ---- INTERSEÇÕES TORSO x PLANOS (realce em vermelho) ----
 intersection_actors = []
 for info in linha_planes_info:
@@ -372,10 +392,7 @@ for info in linha_planes_info:
     else:
         print(f"[AVISO] Sem interseção detectada para '{info['name']}' (slice vazio).")
 
-
-
 plotter.add_legend(size=(0, 0))  # reposicionar legenda se necessário
-
 
 # -----------------------------s
 #  ESFERA DE PREVIEW
@@ -544,7 +561,6 @@ def on_left_click(iren, event):
             current_preview_position = snapped
             plotter.render()
 
-
 def move_preview(iren, event):
     global current_preview_position, preview_actor, is_space_pressed
     if is_space_pressed:
@@ -570,8 +586,6 @@ def move_preview(iren, event):
     preview_actor.SetPosition(snapped)
     current_preview_position = snapped
     plotter.render()
-
-
 
 def capture_key_events(iren, event):
     global is_space_pressed, key
@@ -600,10 +614,248 @@ def save_files():
                 f.write(f"Eletrodo #{idx} ({label}): "
                         f"X={position[0]:.2f}, Y={position[1]:.2f}, Z={position[2]:.2f}\n")
         print(f"Arquivo '{txt_file_path}' salvo com sucesso!")
-        
+
+def create_interactive_plane():
+    global plane_center, plane_normal, plane_actor
+
+    plane_center = np.mean(mesh_torso_proj.points, axis=0)
+    plane_normal = np.array([0, 1, 0])  # plano "frontal"
+
+    bounds = mesh_torso_proj.bounds
+    size = max(bounds[1]-bounds[0],
+               bounds[3]-bounds[2],
+               bounds[5]-bounds[4]) * 1.2
+
+    plane = pv.Plane(
+        center=plane_center,
+        direction=plane_normal,
+        i_size=size,
+        j_size=size
+    )
+
+    plane_actor = plotter.add_mesh(
+        plane, color='cyan', opacity=0.3
+    )
+
+    update_plane_intersection()
+
+def update_plane_intersection():
+    global intersection_actor
+
+    if intersection_actor is not None:
+        plotter.remove_actor(intersection_actor)
+
+    slc = mesh_torso_proj.slice(
+        origin=plane_center,
+        normal=plane_normal
+    )
+
+    if slc.n_points > 1:
+        tube = slc.tube(radius=2.0)
+        intersection_actor = plotter.add_mesh(
+            tube, color='red', lighting=False
+        )
+
+    plotter.render()
+
+def update_plane():
+    global plane_actor
+
+    plotter.remove_actor(plane_actor)
+
+    bounds = mesh_torso_proj.bounds
+    size = max(bounds[1]-bounds[0],
+               bounds[3]-bounds[2],
+               bounds[5]-bounds[4]) * 1.2
+
+    plane = pv.Plane(
+        center=plane_center,
+        direction=plane_normal,
+        i_size=size,
+        j_size=size
+    )
+
+    plane_actor = plotter.add_mesh(
+        plane, color='cyan', opacity=0.3
+    )
+
+    update_plane_intersection()
+
+def move_plane(dx=0, dy=0, dz=0, step=1.0):
+    global plane_center
+    plane_center += np.array([dx, dy, dz]) * step
+    update_plane()
+    
+def rotate_plane_x(angle_deg=5):
+    global plane_normal
+
+    angle = np.radians(angle_deg)
+
+    R = np.array([
+        [1, 0, 0],
+        [0, np.cos(angle), -np.sin(angle)],
+        [0, np.sin(angle),  np.cos(angle)]
+    ])
+
+    plane_normal = R @ plane_normal
+    plane_normal /= np.linalg.norm(plane_normal)
+
+    update_plane()
+  
+def rotate_plane_z(angle_deg=5):
+    global plane_normal
+
+    angle = np.radians(angle_deg)
+
+    R = np.array([
+        [np.cos(angle), -np.sin(angle), 0],
+        [np.sin(angle),  np.cos(angle), 0],
+        [0, 0, 1]
+    ])
+
+    plane_normal = R @ plane_normal
+    plane_normal /= np.linalg.norm(plane_normal)
+
+    update_plane()
+
+def rotate_plane_y(angle_deg=5):
+    global plane_normal
+
+    angle = np.radians(angle_deg)
+
+    R = np.array([
+        [ np.cos(angle), 0, np.sin(angle)],
+        [0, 1, 0],
+        [-np.sin(angle), 0, np.cos(angle)]
+    ])
+
+    plane_normal = R @ plane_normal
+    plane_normal /= np.linalg.norm(plane_normal)
+
+    update_plane()
+
+def open_plane_control():
+    global plane_window, plane_actor
+
+    if plane_actor is None:
+        create_interactive_plane()
+
+    if plane_window is None:
+        plane_window = PlaneControlWindow()
+
+    plane_window.show()
+
+def save_current_plane_vtp():
+    global plane_center, plane_normal, saved_planes, saved_planes_order
+
+    file_path, _ = QFileDialog.getSaveFileName(
+        None,
+        tr("save_plane_vtp"),
+        "",
+        "VTP files (*.vtp)"
+    )
+
+    if not file_path:
+        return
+
+    name = os.path.basename(file_path)
+
+    # tamanho do plano
+    bounds = mesh_torso_proj.bounds
+    size = max(bounds[1]-bounds[0],
+               bounds[3]-bounds[2],
+               bounds[5]-bounds[4]) * 1.2
+
+    plane = pv.Plane(
+        center=plane_center,
+        direction=plane_normal,
+        i_size=size,
+        j_size=size
+    )
+
+    plane.save(file_path)
+
+    # 🔴 SE JÁ EXISTE → remove antigo
+    if name in saved_planes:
+        old = saved_planes[name]
+
+        if old["actor"] is not None:
+            plotter.remove_actor(old["actor"])
+
+        if old["intersection"] is not None:
+            plotter.remove_actor(old["intersection"])
+
+        # remove da ordem
+        saved_planes_order.remove(name)
+
+    # cria novos atores
+    new_plane_actor = plotter.add_mesh(
+        plane,
+        color='cyan',
+        opacity=0.3
+    )
+
+    new_intersection = create_plane_intersection(plane_center, plane_normal)
+
+    # salva
+    saved_planes[name] = {
+        "center": plane_center.copy(),
+        "normal": plane_normal.copy(),
+        "actor": new_plane_actor,
+        "intersection": new_intersection
+    }
+
+    saved_planes_order.append(name)
+
+    plotter.render()
+
+def create_plane_intersection(center, normal):
+    slc = mesh_torso_proj.slice(origin=center, normal=normal)
+
+    if slc.n_points > 1:
+        try:
+            tube = slc.tube(radius=2.0)
+            actor = plotter.add_mesh(
+                tube,
+                color='red',
+                lighting=False
+            )
+        except:
+            actor = plotter.add_mesh(
+                slc,
+                color='red',
+                line_width=6,
+                render_lines_as_tubes=True,
+                lighting=False
+            )
+
+        return actor
+
+    return None
+
+def remove_last_plane():
+    global saved_planes, saved_planes_order
+
+    if not saved_planes_order:
+        return
+
+    last_name = saved_planes_order.pop()
+    data = saved_planes[last_name]
+
+    if data["actor"] is not None:
+        plotter.remove_actor(data["actor"])
+
+    if data["intersection"] is not None:
+        plotter.remove_actor(data["intersection"])
+
+    del saved_planes[last_name]
+
+    plotter.render()
+
 # -------------------------------------------------
 #  IMPORTAR COORDENADAS SALVAS
 # -------------------------------------------------
+
 def import_files():
     """
     Abre um .txt salvo pelo programa, apaga quaisquer
@@ -647,7 +899,6 @@ def import_files():
     plotter.render()
     print(f"Arquivo '{txt_file_path}' importado com sucesso!")
 
-
 def move_preview_free(dx=0.0, dy=0.0, dz=0.0, step=1.0):
     """
     Move a esfera de preview livremente (sem snap).
@@ -659,7 +910,6 @@ def move_preview_free(dx=0.0, dy=0.0, dz=0.0, step=1.0):
     preview_actor.SetPosition(new_position)
     current_preview_position = new_position
     plotter.render()
-
 
 # ---------------------------------------------------
 #   JANELA 1: CONTROLE DE ELETRODOS
@@ -794,6 +1044,10 @@ class ControlWindow(QWidget):
         layout.addWidget(self.button_import)
         layout.addWidget(self.button_close)
 
+        self.button_plane = QPushButton(tr("create_plane"))
+        self.button_plane.clicked.connect(open_plane_control)
+        layout.addWidget(self.button_plane)
+
         # -------------------------
         # Toggles
         # -------------------------
@@ -866,11 +1120,15 @@ class ControlWindow(QWidget):
         self.btn_y_pos.setText(tr("axis_y_pos"))
         self.btn_z_neg.setText(tr("axis_z_neg"))
         self.btn_z_pos.setText(tr("axis_z_pos"))
+        self.button_plane.setText(tr("create_plane"))
 
         self.refresh_toggle_texts()
 
         if 'camera_window' in globals() and camera_window is not None:
             camera_window.refresh_ui_texts()
+
+        if 'plane_window' in globals() and plane_window is not None:
+            plane_window.refresh_ui_texts()
 
     def change_language(self):
         global CURRENT_LANG
@@ -893,8 +1151,6 @@ class ControlWindow(QWidget):
             actor.GetProperty().SetOpacity(0.7 if visible else 0.0)
 
         plotter.render()
-
-
 
 # ---------------------------------------------------
 #  JANELA 2: CONTROLE DE CÂMERA (com reset)
@@ -1072,6 +1328,201 @@ class CameraControlWindow(QWidget):
         print(tr("camera_angles", az=az, el=el))
         print(tr("camera_footer"))
 
+class PlaneControlWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setGeometry(1800, 100, 250, 300)
+
+        layout = QVBoxLayout()
+
+        # -------------------------
+        # LABELS (DINÂMICAS)
+        # -------------------------
+        self.label_move = QLabel()
+        layout.addWidget(self.label_move)
+
+        # -------------------------
+        # STEP DO PLANO
+        # -------------------------
+        self.step_row = QHBoxLayout()
+
+        self.step_label = QLabel(tr("step_label"))
+        self.step_spin = QDoubleSpinBox()
+        self.step_spin.setDecimals(2)
+        self.step_spin.setRange(0.01, 1000.0)
+        self.step_spin.setSingleStep(0.25)
+        self.step_spin.setValue(1.0)
+
+        self.step_row.addWidget(self.step_label)
+        self.step_row.addWidget(self.step_spin)
+
+        layout.addLayout(self.step_row)
+
+        def step_val():
+            return self.step_spin.value()
+
+        # -------------------------
+        # MOVIMENTO
+        # -------------------------
+        def make_move_row(axis):
+            row = QHBoxLayout()
+
+            btn_neg = QPushButton()
+            btn_pos = QPushButton()
+
+            if axis == 'X':
+                btn_neg.clicked.connect(lambda: move_plane(dx=-1, step=step_val()))
+                btn_pos.clicked.connect(lambda: move_plane(dx=+1, step=step_val()))
+            elif axis == 'Y':
+                btn_neg.clicked.connect(lambda: move_plane(dy=-1, step=step_val()))
+                btn_pos.clicked.connect(lambda: move_plane(dy=+1, step=step_val()))
+            elif axis == 'Z':
+                btn_neg.clicked.connect(lambda: move_plane(dz=-1, step=step_val()))
+                btn_pos.clicked.connect(lambda: move_plane(dz=+1, step=step_val()))
+
+            row.addWidget(btn_neg)
+            row.addWidget(btn_pos)
+
+            return row, btn_neg, btn_pos
+
+        self.row_x, self.btn_x_neg, self.btn_x_pos = make_move_row('X')
+        self.row_y, self.btn_y_neg, self.btn_y_pos = make_move_row('Y')
+        self.row_z, self.btn_z_neg, self.btn_z_pos = make_move_row('Z')
+
+        layout.addLayout(self.row_x)
+        layout.addLayout(self.row_y)
+        layout.addLayout(self.row_z)
+
+        # -------------------------
+        # LABEL ROTAÇÃO
+        # -------------------------
+        self.label_rotate = QLabel()
+        layout.addWidget(self.label_rotate)
+
+        # -------------------------
+        # STEP DE ROTAÇÃO
+        # -------------------------
+        self.rot_step_row = QHBoxLayout()
+
+        self.rot_step_label = QLabel(tr("step_label"))
+        self.rot_step_spin = QDoubleSpinBox()
+        self.rot_step_spin.setDecimals(1)
+        self.rot_step_spin.setRange(0.1, 180.0)
+        self.rot_step_spin.setSingleStep(1.0)
+        self.rot_step_spin.setValue(1.0)
+
+        self.rot_step_row.addWidget(self.rot_step_label)
+        self.rot_step_row.addWidget(self.rot_step_spin)
+
+        layout.addLayout(self.rot_step_row)
+
+        def rot_step_val():
+            return self.rot_step_spin.value()
+
+        # -------------------------
+        # ROTAÇÃO
+        # -------------------------
+        def make_rot_row(axis):
+            row = QHBoxLayout()
+
+            btn_neg = QPushButton()
+            btn_pos = QPushButton()
+
+            if axis == 'X':
+                btn_neg.clicked.connect(lambda: rotate_plane_x(-rot_step_val()))
+                btn_pos.clicked.connect(lambda: rotate_plane_x(+rot_step_val()))
+            elif axis == 'Y':
+                btn_neg.clicked.connect(lambda: rotate_plane_y(-rot_step_val()))
+                btn_pos.clicked.connect(lambda: rotate_plane_y(+rot_step_val()))
+            elif axis == 'Z':
+                btn_neg.clicked.connect(lambda: rotate_plane_z(-rot_step_val()))
+                btn_pos.clicked.connect(lambda: rotate_plane_z(+rot_step_val()))
+
+            row.addWidget(btn_neg)
+            row.addWidget(btn_pos)
+
+            return row, btn_neg, btn_pos
+
+        self.rot_row_x, self.btn_rx_neg, self.btn_rx_pos = make_rot_row('X')
+        self.rot_row_y, self.btn_ry_neg, self.btn_ry_pos = make_rot_row('Y')
+        self.rot_row_z, self.btn_rz_neg, self.btn_rz_pos = make_rot_row('Z')
+
+        layout.addLayout(self.rot_row_x)
+        layout.addLayout(self.rot_row_y)
+        layout.addLayout(self.rot_row_z)
+
+        # -------------------------
+        # RESET
+        # -------------------------
+        self.btn_reset = QPushButton()
+
+        def reset_plane():
+            global plane_normal, plane_center
+            plane_normal = np.array([0, 1, 0])
+            plane_center = np.mean(mesh_torso_proj.points, axis=0)
+            update_plane()
+
+        self.btn_reset.clicked.connect(reset_plane)
+        layout.addWidget(self.btn_reset)
+
+        self.button_save_plane = QPushButton(tr("create_plane"))
+        self.button_save_plane.clicked.connect(save_current_plane_vtp)
+        layout.addWidget(self.button_save_plane)
+
+        self.btn_remove_last = QPushButton(tr("remove_last_plane"))
+        self.btn_remove_last.clicked.connect(remove_last_plane)
+        layout.addWidget(self.btn_remove_last)
+
+        self.setLayout(layout)
+
+        # 🔥 IMPORTANTE: atualiza textos ao iniciar
+        self.refresh_ui_texts()
+
+    def refresh_ui_texts(self):
+        self.setWindowTitle(tr("window_plane_title"))
+
+        self.label_move.setText(tr("plane_move"))
+        self.label_rotate.setText(tr("plane_rotate"))
+
+        # Movimento
+        self.btn_x_neg.setText("X-")
+        self.btn_x_pos.setText("X+")
+        self.btn_y_neg.setText("Y-")
+        self.btn_y_pos.setText("Y+")
+        self.btn_z_neg.setText("Z-")
+        self.btn_z_pos.setText("Z+")
+
+        # Rotação
+        self.btn_rx_neg.setText("X-")
+        self.btn_rx_pos.setText("X+")
+        self.btn_ry_neg.setText("Y-")
+        self.btn_ry_pos.setText("Y+")
+        self.btn_rz_neg.setText("Z-")
+        self.btn_rz_pos.setText("Z+")
+
+        self.btn_reset.setText(tr("plane_reset"))
+        self.button_save_plane.setText(tr("create_plane"))
+        self.btn_remove_last.setText(tr("remove_last_plane"))
+        self.step_label.setText(tr("step_label"))
+        self.rot_step_label.setText(tr("step_label"))
+
+    def closeEvent(self, event):
+        global plane_actor, intersection_actor
+
+        # 🔥 remove plano interativo (não salvo)
+        if plane_actor is not None:
+            plotter.remove_actor(plane_actor)
+            plane_actor = None
+
+        # 🔥 remove interseção do plano interativo
+        if intersection_actor is not None:
+            plotter.remove_actor(intersection_actor)
+            intersection_actor = None
+
+        plotter.render()
+
+        event.accept()
+
 # ----------------------------------------
 #  CRIANDO JANELAS E INICIANDO APLICAÇÃO
 # ----------------------------------------
@@ -1084,6 +1535,11 @@ camera_window.show()
 plotter.iren.add_observer("LeftButtonPressEvent", on_left_click)
 plotter.iren.add_observer("KeyPressEvent", move_preview)
 plotter.iren.add_observer("KeyPressEvent", capture_key_events)
+
+# create_interactive_plane()
+
+# plane_window = PlaneControlWindow()
+# plane_window.show()
 
 # plotter.show()
 app.exec_()
